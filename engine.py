@@ -1,4 +1,6 @@
 import random
+from tabnanny import check
+
 
 class Ship:
     def __init__(self, size):
@@ -52,19 +54,25 @@ class Player:
             print(" ".join(indexes[(row - 1) * 10: row * 10]))
 
 class Game:
-    def __init__(self):
+    def __init__(self, human1, human2):
+        self.human1 = human1
+        self.human2 = human2
         self.player1 = Player ()
         self.player2 = Player ()
         self.player1_turn = True
+        self.computer_turn = True if not self.human1 else False
         self.over = False
+        self.result = None
 
     def make_move (self, i):
         player = self.player1 if self.player1_turn else self.player2
         opponent = self.player2 if self.player1_turn else self.player1
+        hit = False
 
         # set miss "M" or hit "H"
         if i in opponent.indexes:
             player.search[i] = "H"
+            hit = True
 
             # check if ship is sunk ("S")
             for ship in opponent.ships:
@@ -78,5 +86,65 @@ class Game:
                         player.search[i] = "S"
         else:
             player.search[i] = "M"
-        self.player1_turn = not self.player1_turn
 
+         # check if game over
+        game_over = True
+        for i in opponent.indexes:
+            if player.search[i] == "U":
+                    game_over = False
+        self.over = game_over
+        self.result = 1 if self.player1_turn else 2
+
+        if not hit:
+            self.player1_turn = not self.player1_turn
+
+            # switch between human and computer turns
+            if (self.human1 and not self.human2) or (not self.human1 and self.human2):
+                self.computer_turn = not self.computer_turn
+
+    def random_ai(self):
+        search = self.player1.search if self.player1_turn else self.player2.search
+        unknown = [i for i, square in enumerate(search) if square == "U"]
+        if len(unknown) > 0:
+            random_index = random.choice(unknown)
+            self.make_move(random_index)
+
+    def basic_ai(self):
+        # setup
+        search = self.player1.search if self.player1_turn else self.player2.search
+        unknown = [i for i, square in enumerate(search) if square == "U"]
+        hits = [i for i, square in enumerate(search) if square == "H"]
+
+        # search in neighborhood of hits
+        unknown_with_neighboring_hits1 = []
+        unknown_with_neighboring_hits2 = []
+        for u in unknown:
+            if u + 1 in hits or u - 1 in hits or u - 10 in hits or u + 10 in hits:
+                unknown_with_neighboring_hits1.append(u)
+            if u + 2 in hits or u - 2 in hits or u - 20 in hits or u + 20 in hits:
+                unknown_with_neighboring_hits2.append(u)
+
+        for u in unknown:
+            if u in unknown_with_neighboring_hits1 and u in unknown_with_neighboring_hits2:
+                self.make_move(u)
+                return
+
+        # pick "u" square that has a neighbor marked as "H"
+        if len(unknown_with_neighboring_hits1) > 0:
+            self.make_move(random.choice(unknown_with_neighboring_hits1))
+            return
+
+        # checker board pattern
+        checker_board = []
+        for u in unknown:
+            row = u // 10
+            col = u % 10
+            if (row+col) % 2 == 0:
+                checker_board.append(u)
+        if len(checker_board) > 0:
+            self.make_move(random.choice(checker_board))
+            return
+
+
+        # random move
+        self.random_ai()

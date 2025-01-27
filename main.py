@@ -1,3 +1,4 @@
+from random import random
 from re import search
 from token import INDENT
 from engine import Player
@@ -8,7 +9,9 @@ from pygame.examples.moveit import WIDTH, HEIGHT
 from engine import Player
 
 pygame.init()
+pygame.font.init()
 pygame.display.set_caption("Battleship")
+myfont = pygame.font.SysFont("fresansttf", 100)
 
 # global variables
 SQ_SIZE = 35
@@ -18,6 +21,8 @@ WIDTH = SQ_SIZE * 10 * 2 + H_MARGIN
 HEIGHT = SQ_SIZE * 10 * 2 + V_MARGIN
 INDENT = 8
 SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
+HUMAN1 = False
+HUMAN2 = False
 
 #colors
 GREEN = (50,200,150)
@@ -53,7 +58,7 @@ def draw_ships (player, left = 0, top = 0):
         rectangle = pygame.Rect(x, y, width, height)
         pygame. draw. rect (SCREEN, GREEN, rectangle, border_radius=10)
 
-game = Game()
+game = Game(HUMAN1, HUMAN2)
 
 
 
@@ -66,9 +71,9 @@ while animating:
             animating = False
 
         # user clicks on mouse
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN and not game.over:
             x, y = pygame.mouse.get_pos()
-            if  game.player1_turn and x < SQ_SIZE*10 and y < SQ_SIZE*10:
+            if game.player1_turn and x < SQ_SIZE*10 and y < SQ_SIZE*10:
                 row = y // SQ_SIZE
                 col = x // SQ_SIZE
                 index = row * 10 + col
@@ -76,8 +81,6 @@ while animating:
             elif not game.player1_turn and x > WIDTH - SQ_SIZE*10 and y > SQ_SIZE*10 + V_MARGIN:
                 row = (y - SQ_SIZE*10 - V_MARGIN) // SQ_SIZE
                 col = (x- SQ_SIZE*10-H_MARGIN) // SQ_SIZE
-                print(row)
-                print(col)
                 index = row * 10 + col
                 game.make_move(index)
 
@@ -88,6 +91,9 @@ while animating:
 
             if event.key == pygame.K_SPACE:
                     pausing = not pausing
+
+            if event.key == pygame.K_RETURN:
+                game = Game(HUMAN1, HUMAN2)
 
         if not pausing:
             SCREEN.fill(GREY)
@@ -102,7 +108,19 @@ while animating:
             draw_ships(game.player1, top=(HEIGHT-V_MARGIN)//2+V_MARGIN)
             draw_ships(game.player2, left = (WIDTH-H_MARGIN)//2 + H_MARGIN)
 
+            #computer moves
+            if not game.over and game.computer_turn:
+                if game.player1_turn:
+                    game.basic_ai()
+                else:
+                    game.basic_ai()
+            # game over message
+            if game.over:
+                text = "Player" + str(game.result) + "wins!"
+                textbox = myfont.render(text, False, GREY, WHITE)
+                SCREEN.blit(textbox, (WIDTH // 2 - 240, HEIGHT // 2 - 50))
 
+            pygame.time.wait(0)
             pygame.display.flip()
 
 
