@@ -63,6 +63,7 @@ class Game:
         self.computer_turn = True if not self.human1 else False
         self.over = False
         self.result = None
+        self.n_shots = 0
 
     def make_move (self, i):
         player = self.player1 if self.player1_turn else self.player2
@@ -101,6 +102,8 @@ class Game:
             # switch between human and computer turns
             if (self.human1 and not self.human2) or (not self.human1 and self.human2):
                 self.computer_turn = not self.computer_turn
+
+        self.n_shots += 1
 
     def random_ai(self):
         search = self.player1.search if self.player1_turn else self.player2.search
@@ -148,3 +151,91 @@ class Game:
 
         # random move
         self.random_ai()
+
+    def probability_ai(self):
+        search = self.player1.search if self.player1_turn else self.player2.search
+        unknown = [i for i, square in enumerate(search) if square == "U"]
+        hits = [i for i, square in enumerate(search) if square == "H"]
+
+        # Ініціалізація карти ймовірностей з нулями
+        probability_map = [0] * 100
+
+        # Крок 1: Якщо є попадання, спробуємо знайти решту частини корабля
+        for hit in hits:
+            row = hit // 10
+            col = hit % 10
+
+            # Перевірка горизонтальних (ліво/право) та вертикальних (вгору/вниз) напрямків від попадання
+            # Горизонтальні перевірки (ліво та право)
+            for direction in [-1, 1]:
+                # Йдемо вліво чи вправо
+                length = 1
+                while 0 <= col + direction * length < 10 and search[hit + direction * length] == "U":
+                    probability_map[hit + direction * length] += 1
+                    length += 1
+
+            # Вертикальні перевірки (вгору та вниз)
+            for direction in [-10, 10]:
+                # Йдемо вгору чи вниз
+                length = 1
+                while 0 <= hit + direction * length < 100 and search[hit + direction * length] == "U":
+                    probability_map[hit + direction * length] += 1
+                    length += 1
+
+        # Крок 2: Покарання за клітинки, що вже пропущені
+        for i in range(100):
+            if search[i] == "M":
+                probability_map[i] -= 3  # Тяжче покарання за пропущені клітинки
+
+        # Крок 3: Уточнення ймовірностей з урахуванням розмірів кораблів та їх розташування
+        ship_sizes = [5, 4, 3, 3, 2]  # Розміри кораблів, які використовуються в грі
+        for ship_size in ship_sizes:
+            for i in range(100):
+                if search[i] == "U":
+                    row = i // 10
+                    col = i % 10
+                    # Горизонтальне розташування корабля
+                    if col + ship_size <= 9:
+                        for j in range(ship_size):
+                            if search[i + j] == "U":  # Коригуємо тільки для "U" клітинок
+                                probability_map[i + j] += 1
+                    # Вертикальне розташування корабля
+                    if row + ship_size <= 9:
+                        for j in range(ship_size):
+                            if search[i + j * 10] == "U":  # Коригуємо тільки для "U" клітинок
+                                probability_map[i + j * 10] += 1
+
+        # Крок 4: Вибір найкращого ходу, з урахуванням вищої ймовірності для залишкових невідомих клітинок
+        best_move = max(range(100), key=lambda x: probability_map[x] if search[x] == "U" else -1)
+        self.make_move(best_move)
+
+    def hunting_targeting_ai(self):
+        search = self.player1.search if self.player1_turn else self.player2.search
+        unknown = [i for i, square in enumerate(search) if square == "U"]
+        hits = [i for i, square in enumerate(search) if square == "H"]
+
+        if len(hits) == 0:
+            # Start hunting (if no hits yet)
+            self.random_ai()
+            return
+
+        # Try to target nearby squares after a hit
+        target_squares = []
+        for hit in hits:
+            row = hit // 10
+            col = hit % 10
+            # Check neighboring squares (up, down, left, right)
+            for r, c in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                new_row = row + r
+                new_col = col + c
+                if 0 <= new_row < 10 and 0 <= new_col < 10:
+                    target_square = new_row * 10 + new_col
+                    if search[target_square] == "U":
+                        target_squares.append(target_square)
+
+        if target_squares:
+            # Make a move targeting the nearest square around a hit
+            self.make_move(random.choice(target_squares))
+        else:
+            # If no neighboring squares found, revert to a random move
+            self.random_ai()
